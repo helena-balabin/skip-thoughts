@@ -21,10 +21,10 @@
 
 import tensorflow as tf
 
-_layer_norm = tf.contrib.layers.layer_norm
+_layer_norm = tf.keras.layers.LayerNormalization(axis=1)
 
 
-class LayerNormGRUCell(tf.contrib.rnn.RNNCell):
+class LayerNormGRUCell(tf.keras.layers.SimpleRNNCell):
   """GRU cell with layer normalization.
 
   The layer normalization implementation is based on:
@@ -112,23 +112,23 @@ class LayerNormGRUCell(tf.contrib.rnn.RNNCell):
     input_dim = inputs.get_shape().as_list()[1]
     num_units = self._num_units
 
-    with tf.variable_scope(scope or "gru_cell"):
-      with tf.variable_scope("gates"):
-        w_h = tf.get_variable(
+    with tf.compat.v1.variable_scope(scope or "gru_cell"):
+      with tf.compat.v1.variable_scope("gates"):
+        w_h = tf.compat.v1.get_variable(
             "w_h", [num_units, 2 * num_units],
             initializer=self._w_h_initializer())
-        w_x = tf.get_variable(
+        w_x = tf.compat.v1.get_variable(
             "w_x", [input_dim, 2 * num_units],
             initializer=self._w_x_initializer(input_dim))
-        z_and_r = (_layer_norm(tf.matmul(state, w_h), scope="layer_norm/w_h") +
-                   _layer_norm(tf.matmul(inputs, w_x), scope="layer_norm/w_x"))
+        z_and_r = (_layer_norm(tf.matmul(state, w_h)) +
+                   _layer_norm(tf.matmul(inputs, w_x)))
         z, r = tf.split(tf.sigmoid(z_and_r), 2, 1)
-      with tf.variable_scope("candidate"):
-        w = tf.get_variable(
+      with tf.compat.v1.variable_scope("candidate"):
+        w = tf.compat.v1.get_variable(
             "w", [input_dim, num_units], initializer=self._w_initializer)
-        u = tf.get_variable(
+        u = tf.compat.v1.get_variable(
             "u", [num_units, num_units], initializer=self._u_initializer)
-        h_hat = (r * _layer_norm(tf.matmul(state, u), scope="layer_norm/u") +
-                 _layer_norm(tf.matmul(inputs, w), scope="layer_norm/w"))
+        h_hat = (r * tf.matmul(state, u) +
+                 tf.matmul(inputs, w))
       new_h = (1 - z) * state + z * self._activation(h_hat)
     return new_h, new_h

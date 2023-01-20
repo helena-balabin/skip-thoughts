@@ -32,7 +32,7 @@ tf.flags.DEFINE_string("input_file_pattern", None,
 tf.flags.DEFINE_string("train_dir", None,
                        "Directory for saving and loading checkpoints.")
 
-tf.logging.set_verbosity(tf.logging.INFO)
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
 
 
 def _setup_learning_rate(config, global_step):
@@ -46,7 +46,7 @@ def _setup_learning_rate(config, global_step):
     learning_rate: Tensor; the learning rate with exponential decay.
   """
   if config.learning_rate_decay_factor > 0:
-    learning_rate = tf.train.exponential_decay(
+    learning_rate = tf.compat.v1.train.exponential_decay(
         learning_rate=float(config.learning_rate),
         global_step=global_step,
         decay_steps=config.learning_rate_decay_steps,
@@ -67,14 +67,14 @@ def main(unused_argv):
       input_file_pattern=FLAGS.input_file_pattern)
   training_config = configuration.training_config()
 
-  tf.logging.info("Building training graph.")
+  tf.compat.v1.logging.info("Building training graph.")
   g = tf.Graph()
   with g.as_default():
     model = skip_thoughts_model.SkipThoughtsModel(model_config, mode="train")
     model.build()
 
     learning_rate = _setup_learning_rate(training_config, model.global_step)
-    optimizer = tf.train.AdamOptimizer(learning_rate)
+    optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate)
 
     train_tensor = tf.contrib.slim.learning.create_train_op(
         total_loss=model.total_loss,
@@ -82,7 +82,7 @@ def main(unused_argv):
         global_step=model.global_step,
         clip_gradient_norm=training_config.clip_gradient_norm)
 
-    saver = tf.train.Saver()
+    saver = tf.compat.v1.train.Saver()
 
   tf.contrib.slim.learning.train(
       train_op=train_tensor,
@@ -96,4 +96,4 @@ def main(unused_argv):
 
 
 if __name__ == "__main__":
-  tf.app.run()
+  tf.compat.v1.app.run()

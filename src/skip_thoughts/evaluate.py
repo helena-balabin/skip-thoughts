@@ -74,7 +74,7 @@ tf.flags.DEFINE_string("bi_checkpoint_path", None,
                        "Checkpoint file or directory containing a checkpoint "
                        "file.")
 
-tf.logging.set_verbosity(tf.logging.INFO)
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
 
 
 def main(unused_argv):
@@ -114,4 +114,4 @@ def main(unused_argv):
 
 
 if __name__ == "__main__":
-  tf.app.run()
+  tf.compat.v1.app.run()

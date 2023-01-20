@@ -35,8 +35,7 @@ Layer normalization is applied based on the paper:
 
 import tensorflow as tf
 
-from skip_thoughts.ops import gru_cell
-from skip_thoughts.ops import input_ops
+from skip_thoughts.ops import gru_cell, input_ops
 
 
 def random_orthonormal_initializer(shape, dtype=tf.float32,
@@ -44,7 +43,7 @@ def random_orthonormal_initializer(shape, dtype=tf.float32,
   """Variable initializer that produces a random orthonormal matrix."""
   if len(shape) != 2 or shape[0] != shape[1]:
     raise ValueError("Expecting square shape, got %s" % shape)
-  _, u, _ = tf.svd(tf.random_normal(shape, dtype=dtype), full_matrices=True)
+  _, u, _ = tf.linalg.svd(tf.random.normal(shape, dtype=dtype), full_matrices=True)
   return u
 
 
@@ -68,10 +67,10 @@ class SkipThoughtsModel(object):
 
     self.config = config
     self.mode = mode
-    self.reader = input_reader if input_reader else tf.TFRecordReader()
+    self.reader = input_reader if input_reader else tf.compat.v1.TFRecordReader()
 
     # Initializer used for non-recurrent weights.
-    self.uniform_initializer = tf.random_uniform_initializer(
+    self.uniform_initializer = tf.compat.v1.random_uniform_initializer(
         minval=-self.config.uniform_init_scale,
         maxval=self.config.uniform_init_scale)
 
@@ -124,7 +123,7 @@ class SkipThoughtsModel(object):
       encode_ids = None
       decode_pre_ids = None
       decode_post_ids = None
-      encode_mask = tf.placeholder(tf.int8, (None, None), name="encode_mask")
+      encode_mask = tf.compat.v1.placeholder(tf.int8, (None, None), name="encode_mask")
       decode_pre_mask = None
       decode_post_mask = None
     else:
@@ -173,20 +172,20 @@ class SkipThoughtsModel(object):
     if self.mode == "encode":
       # Word embeddings are fed from an external vocabulary which has possibly
       # been expanded (see vocabulary_expansion.py).
-      encode_emb = tf.placeholder(tf.float32, (
+      encode_emb = tf.compat.v1.placeholder(tf.float32, (
           None, None, self.config.word_embedding_dim), "encode_emb")
       # No sequences to decode.
       decode_pre_emb = None
       decode_post_emb = None
     else:
-      word_emb = tf.get_variable(
+      word_emb = tf.compat.v1.get_variable(
           name="word_embedding",
           shape=[self.config.vocab_size, self.config.word_embedding_dim],
           initializer=self.uniform_initializer)
 
-      encode_emb = tf.nn.embedding_lookup(word_emb, self.encode_ids)
-      decode_pre_emb = tf.nn.embedding_lookup(word_emb, self.decode_pre_ids)
-      decode_post_emb = tf.nn.embedding_lookup(word_emb, self.decode_post_ids)
+      encode_emb = tf.nn.embedding_lookup(params=word_emb, ids=self.encode_ids)
+      decode_pre_emb = tf.nn.embedding_lookup(params=word_emb, ids=self.decode_pre_ids)
+      decode_post_emb = tf.nn.embedding_lookup(params=word_emb, ids=self.decode_post_ids)
 
     self.encode_emb = encode_emb
     self.decode_pre_emb = decode_pre_emb
@@ -211,7 +210,7 @@ class SkipThoughtsModel(object):
         num_units,
         w_initializer=self.uniform_initializer,
         u_initializer=random_orthonormal_initializer,
-        b_initializer=tf.constant_initializer(0.0))
+        b_initializer=tf.compat.v1.constant_initializer(0.0))
 
   def build_encoder(self):
     """Builds the sentence encoder.
@@ -227,8 +226,8 @@ class SkipThoughtsModel(object):
       ValueError: if config.bidirectional_encoder is True and config.encoder_dim
         is odd.
     """
-    with tf.variable_scope("encoder") as scope:
-      length = tf.to_int32(tf.reduce_sum(self.encode_mask, 1), name="length")
+    with tf.compat.v1.variable_scope("encoder") as scope:
+      length = tf.cast(tf.reduce_sum(input_tensor=self.encode_mask, axis=1), name="length", dtype=tf.int32)
 
       if self.config.bidirectional_encoder:
         if self.config.encoder_dim % 2:
@@ -237,7 +236,7 @@ class SkipThoughtsModel(object):
         num_units = self.config.encoder_dim // 2
         cell_fw = self._initialize_gru_cell(num_units)  # Forward encoder
         cell_bw = self._initialize_gru_cell(num_units)  # Backward encoder
-        _, states = tf.nn.bidirectional_dynamic_rnn(
+        _, states = tf.compat.v1.nn.bidirectional_dynamic_rnn(
             cell_fw=cell_fw,
             cell_bw=cell_bw,
             inputs=self.encode_emb,
@@ -247,7 +246,7 @@ class SkipThoughtsModel(object):
         thought_vectors = tf.concat(states, 1, name="thought_vectors")
       else:
         cell = self._initialize_gru_cell(self.config.encoder_dim)
-        _, state = tf.nn.dynamic_rnn(
+        _, state = tf.compat.v1.nn.dynamic_rnn(
             cell=cell,
             inputs=self.encode_emb,
             sequence_length=length,
@@ -275,13 +274,13 @@ class SkipThoughtsModel(object):
     """
     # Decoder RNN.
     cell = self._initialize_gru_cell(self.config.encoder_dim)
-    with tf.variable_scope(name) as scope:
+    with tf.compat.v1.variable_scope(name) as scope:
       # Add a padding word at the start of each sentence (to correspond to the
       # prediction of the first word) and remove the last word.
       decoder_input = tf.pad(
-          embeddings[:, :-1, :], [[0, 0], [1, 0], [0, 0]], name="input")
-      length = tf.reduce_sum(mask, 1, name="length")
-      decoder_output, _ = tf.nn.dynamic_rnn(
+          tensor=embeddings[:, :-1, :], paddings=[[0, 0], [1, 0], [0, 0]], name="input")
+      length = tf.reduce_sum(input_tensor=mask, axis=1, name="length")
+      decoder_output, _ = tf.compat.v1.nn.dynamic_rnn(
           cell=cell,
           inputs=decoder_input,
           sequence_length=length,
@@ -291,10 +290,10 @@ class SkipThoughtsModel(object):
     # Stack batch vertically.
     decoder_output = tf.reshape(decoder_output, [-1, self.config.encoder_dim])
     targets = tf.reshape(targets, [-1])
-    weights = tf.to_float(tf.reshape(mask, [-1]))
+    weights = tf.cast(tf.reshape(mask, [-1]), dtype=tf.float32)
 
     # Logits.
-    with tf.variable_scope("logits", reuse=reuse_logits) as scope:
+    with tf.compat.v1.variable_scope("logits", reuse=reuse_logits) as scope:
       logits = tf.contrib.layers.fully_connected(
           inputs=decoder_output,
           num_outputs=self.config.vocab_size,
@@ -304,10 +303,10 @@ class SkipThoughtsModel(object):
 
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
         labels=targets, logits=logits)
-    batch_loss = tf.reduce_sum(losses * weights)
-    tf.losses.add_loss(batch_loss)
+    batch_loss = tf.reduce_sum(input_tensor=losses * weights)
+    tf.compat.v1.losses.add_loss(batch_loss)
 
-    tf.summary.scalar("losses/" + name, batch_loss)
+    tf.compat.v1.summary.scalar("losses/" + name, batch_loss)
 
     self.target_cross_entropy_losses.append(losses)
     self.target_cross_entropy_loss_weights.append(weights)
@@ -346,8 +345,8 @@ class SkipThoughtsModel(object):
       self.total_loss
     """
     if self.mode != "encode":
-      total_loss = tf.losses.get_total_loss()
-      tf.summary.scalar("losses/total", total_loss)
+      total_loss = tf.compat.v1.losses.get_total_loss()
+      tf.compat.v1.summary.scalar("losses/total", total_loss)
 
       self.total_loss = total_loss
 
@@ -357,7 +356,7 @@ class SkipThoughtsModel(object):
     Outputs:
       self.global_step
     """
-    self.global_step = tf.train.create_global_step()
+    self.global_step = tf.compat.v1.train.create_global_step()
 
   def build(self):
     """Creates all ops for training, evaluation or encoding."""

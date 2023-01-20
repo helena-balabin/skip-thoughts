@@ -41,17 +41,17 @@ def parse_example_batch(serialized):
     decode_pre: A SentenceBatch of "previous" sentences to decode.
     decode_post: A SentenceBatch of "post" sentences to decode.
   """
-  features = tf.parse_example(
-      serialized,
+  features = tf.io.parse_example(
+      serialized=serialized,
       features={
-          "encode": tf.VarLenFeature(dtype=tf.int64),
-          "decode_pre": tf.VarLenFeature(dtype=tf.int64),
-          "decode_post": tf.VarLenFeature(dtype=tf.int64),
+          "encode": tf.io.VarLenFeature(dtype=tf.int64),
+          "decode_pre": tf.io.VarLenFeature(dtype=tf.int64),
+          "decode_post": tf.io.VarLenFeature(dtype=tf.int64),
       })
 
   def _sparse_to_batch(sparse):
-    ids = tf.sparse_tensor_to_dense(sparse)  # Padding with zeroes.
-    mask = tf.sparse_to_dense(sparse.indices, sparse.dense_shape,
+    ids = tf.sparse.to_dense(sparse)  # Padding with zeroes.
+    mask = tf.compat.v1.sparse_to_dense(sparse.indices, sparse.dense_shape,
                               tf.ones_like(sparse.values, dtype=tf.int32))
     return SentenceBatch(ids=ids, mask=mask)
 
@@ -80,26 +80,26 @@ def prefetch_input_data(reader,
   """
   data_files = []
   for pattern in file_pattern.split(","):
-    data_files.extend(tf.gfile.Glob(pattern))
+    data_files.extend(tf.io.gfile.glob(pattern))
   if not data_files:
-    tf.logging.fatal("Found no input files matching %s", file_pattern)
+    tf.compat.v1.logging.fatal("Found no input files matching %s", file_pattern)
   else:
-    tf.logging.info("Prefetching values from %d files matching %s",
+    tf.compat.v1.logging.info("Prefetching values from %d files matching %s",
                     len(data_files), file_pattern)
 
-  filename_queue = tf.train.string_input_producer(
+  filename_queue = tf.compat.v1.train.string_input_producer(
       data_files, shuffle=shuffle, capacity=16, name="filename_queue")
 
   if shuffle:
     min_after_dequeue = int(0.6 * capacity)
-    values_queue = tf.RandomShuffleQueue(
+    values_queue = tf.queue.RandomShuffleQueue(
         capacity=capacity,
         min_after_dequeue=min_after_dequeue,
         dtypes=[tf.string],
         shapes=[[]],
         name="random_input_queue")
   else:
-    values_queue = tf.FIFOQueue(
+    values_queue = tf.queue.FIFOQueue(
         capacity=capacity,
         dtypes=[tf.string],
         shapes=[[]],
@@ -109,9 +109,9 @@ def prefetch_input_data(reader,
   for _ in range(num_reader_threads):
     _, value = reader.read(filename_queue)
     enqueue_ops.append(values_queue.enqueue([value]))
-  tf.train.queue_runner.add_queue_runner(
-      tf.train.queue_runner.QueueRunner(values_queue, enqueue_ops))
-  tf.summary.scalar("queue/%s/fraction_of_%d_full" % (values_queue.name,
+  tf.compat.v1.train.queue_runner.add_queue_runner(
+      tf.compat.v1.train.queue_runner.QueueRunner(values_queue, enqueue_ops))
+  tf.compat.v1.summary.scalar("queue/%s/fraction_of_%d_full" % (values_queue.name,
                                                       capacity),
                     tf.cast(values_queue.size(), tf.float32) * (1.0 / capacity))
 

@@ -45,21 +45,23 @@ Or follow the instructions in [tensorflow/models](https://github.com/tensorflow/
 # Encode sentences with unidirectional skip thought vectors
 
 import numpy as np
-from skip_thoughts import configuration
+from src.skip_thoughts import configuration
 from skip_thoughts import encoder_manager
 
 # TODO: Load your dataset here.
 data = []
 
-VOCAB_FILE = "skip_thoughts/pretrained/skip_thoughts_uni_2017_02_02/vocab.txt"
-EMBEDDING_MATRIX_FILE = "skip_thoughts/pretrained/skip_thoughts_uni_2017_02_02/embeddings.npy"
-CHECKPOINT_PATH = "skip_thoughts/pretrained/skip_thoughts_uni_2017_02_02/model.ckpt-501424"
+VOCAB_FILE = "src/skip_thoughts/pretrained/skip_thoughts_uni_2017_02_02/vocab.txt"
+EMBEDDING_MATRIX_FILE = "src/skip_thoughts/pretrained/skip_thoughts_uni_2017_02_02/embeddings.npy"
+CHECKPOINT_PATH = "src/skip_thoughts/pretrained/skip_thoughts_uni_2017_02_02/model.ckpt-501424"
 
 encoder = encoder_manager.EncoderManager()
-encoder.load_model(configuration.model_config(bidirectional_encoder=False),
-                   vocabulary_file=VOCAB_FILE,
-                   embedding_matrix_file=EMBEDDING_MATRIX_FILE,
-                   checkpoint_path=CHECKPOINT_PATH)
+encoder.load_model(
+    configuration.model_config(bidirectional_encoder=False),
+    vocabulary_file=VOCAB_FILE,
+    embedding_matrix_file=EMBEDDING_MATRIX_FILE,
+    checkpoint_path=CHECKPOINT_PATH
+)
 
 encodings = encoder.encode(data)
 ```

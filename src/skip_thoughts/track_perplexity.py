@@ -51,7 +51,7 @@ tf.flags.DEFINE_integer("num_eval_examples", 50000,
 tf.flags.DEFINE_integer("min_global_step", 100,
                         "Minimum global step to run evaluation.")
 
-tf.logging.set_verbosity(tf.logging.INFO)
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
 
 
 def evaluate_model(sess, losses, weights, num_batches, global_step,
@@ -82,15 +82,15 @@ def evaluate_model(sess, losses, weights, num_batches, global_step,
     sum_losses += np.sum(batch_losses * batch_weights)
     sum_weights += np.sum(batch_weights)
     if not i % 100:
-      tf.logging.info("Computed losses for %d of %d batches.", i + 1,
+      tf.compat.v1.logging.info("Computed losses for %d of %d batches.", i + 1,
                       num_batches)
   eval_time = time.time() - start_time
 
   perplexity = math.exp(sum_losses / sum_weights)
-  tf.logging.info("Perplexity = %f (%.2f sec)", perplexity, eval_time)
+  tf.compat.v1.logging.info("Perplexity = %f (%.2f sec)", perplexity, eval_time)
 
   # Log perplexity to the SummaryWriter.
-  summary = tf.Summary()
+  summary = tf.compat.v1.Summary()
   value = summary.value.add()
   value.simple_value = perplexity
   value.tag = "perplexity"
@@ -98,7 +98,7 @@ def evaluate_model(sess, losses, weights, num_batches, global_step,
 
   # Write the Events file to the eval directory.
   summary_writer.flush()
-  tf.logging.info("Finished processing evaluation at global step %d.",
+  tf.compat.v1.logging.info("Finished processing evaluation at global step %d.",
                   global_step)
 
 
@@ -115,25 +115,25 @@ def run_once(model, losses, weights, saver, summary_writer, summary_op):
   """
   model_path = tf.train.latest_checkpoint(FLAGS.checkpoint_dir)
   if not model_path:
-    tf.logging.info("Skipping evaluation. No checkpoint found in: %s",
+    tf.compat.v1.logging.info("Skipping evaluation. No checkpoint found in: %s",
                     FLAGS.checkpoint_dir)
     return
 
-  with tf.Session() as sess:
+  with tf.compat.v1.Session() as sess:
     # Load model from checkpoint.
-    tf.logging.info("Loading model from checkpoint: %s", model_path)
+    tf.compat.v1.logging.info("Loading model from checkpoint: %s", model_path)
     saver.restore(sess, model_path)
-    global_step = tf.train.global_step(sess, model.global_step.name)
-    tf.logging.info("Successfully loaded %s at global step = %d.",
+    global_step = tf.compat.v1.train.global_step(sess, model.global_step.name)
+    tf.compat.v1.logging.info("Successfully loaded %s at global step = %d.",
                     os.path.basename(model_path), global_step)
     if global_step < FLAGS.min_global_step:
-      tf.logging.info("Skipping evaluation. Global step = %d < %d", global_step,
+      tf.compat.v1.logging.info("Skipping evaluation. Global step = %d < %d", global_step,
                       FLAGS.min_global_step)
       return
 
     # Start the queue runners.
     coord = tf.train.Coordinator()
-    threads = tf.train.start_queue_runners(coord=coord)
+    threads = tf.compat.v1.train.start_queue_runners(coord=coord)
 
     num_eval_batches = int(
         math.ceil(FLAGS.num_eval_examples / model.config.batch_size))
@@ -143,7 +143,7 @@ def run_once(model, losses, weights, saver, summary_writer, summary_op):
       evaluate_model(sess, losses, weights, num_eval_batches, global_step,
                      summary_writer, summary_op)
     except tf.InvalidArgumentError:
-      tf.logging.error(
+      tf.compat.v1.logging.error(
           "Evaluation raised InvalidArgumentError (e.g. due to Nans).")
     finally:
       coord.request_stop()
@@ -160,9 +160,9 @@ def main(unused_argv):
 
   # Create the evaluation directory if it doesn't exist.
   eval_dir = FLAGS.eval_dir
-  if not tf.gfile.IsDirectory(eval_dir):
-    tf.logging.info("Creating eval directory: %s", eval_dir)
-    tf.gfile.MakeDirs(eval_dir)
+  if not tf.io.gfile.isdir(eval_dir):
+    tf.compat.v1.logging.info("Creating eval directory: %s", eval_dir)
+    tf.io.gfile.makedirs(eval_dir)
 
   g = tf.Graph()
   with g.as_default():
@@ -178,18 +178,18 @@ def main(unused_argv):
     weights = tf.concat(model.target_cross_entropy_loss_weights, 0)
 
     # Create the Saver to restore model Variables.
-    saver = tf.train.Saver()
+    saver = tf.compat.v1.train.Saver()
 
     # Create the summary operation and the summary writer.
-    summary_op = tf.summary.merge_all()
-    summary_writer = tf.summary.FileWriter(eval_dir)
+    summary_op = tf.compat.v1.summary.merge_all()
+    summary_writer = tf.compat.v1.summary.FileWriter(eval_dir)
 
     g.finalize()
 
     # Run a new evaluation run every eval_interval_secs.
     while True:
       start = time.time()
-      tf.logging.info("Starting evaluation at " + time.strftime(
+      tf.compat.v1.logging.info("Starting evaluation at " + time.strftime(
           "%Y-%m-%d-%H:%M:%S", time.localtime()))
       run_once(model, losses, weights, saver, summary_writer, summary_op)
       time_to_next_eval = start + FLAGS.eval_interval_secs - time.time()
@@ -198,4 +198,4 @@ def main(unused_argv):
 
 
 if __name__ == "__main__":
-  tf.app.run()
+  tf.compat.v1.app.run()

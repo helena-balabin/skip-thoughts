@@ -83,7 +83,7 @@ tf.flags.DEFINE_integer("max_sentence_length", 30,
 tf.flags.DEFINE_boolean("add_eos", True,
                         "Whether to add end-of-sentence ids to the output.")
 
-tf.logging.set_verbosity(tf.logging.INFO)
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
 
 
 def _build_vocabulary(input_files):
@@ -96,30 +96,30 @@ def _build_vocabulary(input_files):
     vocab: A dictionary of word to id.
   """
   if FLAGS.vocab_file:
-    tf.logging.info("Loading existing vocab file.")
+    tf.compat.v1.logging.info("Loading existing vocab file.")
     vocab = collections.OrderedDict()
-    with tf.gfile.GFile(FLAGS.vocab_file, mode="r") as f:
+    with tf.io.gfile.GFile(FLAGS.vocab_file, mode="r") as f:
       for i, line in enumerate(f):
         word = line.decode("utf-8").strip()
         assert word not in vocab, "Attempting to add word twice: %s" % word
         vocab[word] = i
-    tf.logging.info("Read vocab of size %d from %s",
+    tf.compat.v1.logging.info("Read vocab of size %d from %s",
                     len(vocab), FLAGS.vocab_file)
     return vocab
 
-  tf.logging.info("Creating vocabulary.")
+  tf.compat.v1.logging.info("Creating vocabulary.")
   num = 0
   wordcount = collections.Counter()
   for input_file in input_files:
-    tf.logging.info("Processing file: %s", input_file)
-    for sentence in tf.gfile.FastGFile(input_file):
+    tf.compat.v1.logging.info("Processing file: %s", input_file)
+    for sentence in tf.compat.v1.gfile.FastGFile(input_file):
       wordcount.update(sentence.split())
 
       num += 1
       if num % 1000000 == 0:
-        tf.logging.info("Processed %d sentences", num)
+        tf.compat.v1.logging.info("Processed %d sentences", num)
 
-  tf.logging.info("Processed %d sentences total", num)
+  tf.compat.v1.logging.info("Processed %d sentences total", num)
 
   words = list(wordcount.keys())
   freqs = list(wordcount.values())
@@ -131,18 +131,18 @@ def _build_vocabulary(input_files):
   for w_id, w_index in enumerate(sorted_indices[0:FLAGS.num_words - 2]):
     vocab[words[w_index]] = w_id + 2  # 0: EOS, 1: UNK.
 
-  tf.logging.info("Created vocab with %d words", len(vocab))
+  tf.compat.v1.logging.info("Created vocab with %d words", len(vocab))
 
   vocab_file = os.path.join(FLAGS.output_dir, "vocab.txt")
-  with tf.gfile.FastGFile(vocab_file, "w") as f:
+  with tf.compat.v1.gfile.FastGFile(vocab_file, "w") as f:
     f.write("\n".join(list(vocab.keys())))
-  tf.logging.info("Wrote vocab file to %s", vocab_file)
+  tf.compat.v1.logging.info("Wrote vocab file to %s", vocab_file)
 
   word_counts_file = os.path.join(FLAGS.output_dir, "word_counts.txt")
-  with tf.gfile.FastGFile(word_counts_file, "w") as f:
+  with tf.compat.v1.gfile.FastGFile(word_counts_file, "w") as f:
     for i in sorted_indices:
       f.write("%s %d\n" % (words[i], freqs[i]))
-  tf.logging.info("Wrote word counts file to %s", word_counts_file)
+  tf.compat.v1.logging.info("Wrote word counts file to %s", word_counts_file)
 
   return vocab
 
@@ -183,14 +183,14 @@ def _process_input_file(filename, vocab, stats):
   Returns:
     processed: A list of serialized Example protos
   """
-  tf.logging.info("Processing input file: %s", filename)
+  tf.compat.v1.logging.info("Processing input file: %s", filename)
   processed = []
 
   predecessor = None  # Predecessor sentence (list of words).
   current = None  # Current sentence (list of words).
   successor = None  # Successor sentence (list of words).
 
-  for successor_str in tf.gfile.FastGFile(filename):
+  for successor_str in tf.compat.v1.gfile.FastGFile(filename):
     stats.update(["sentences_seen"])
     successor = successor_str.split()
 
@@ -217,18 +217,18 @@ def _process_input_file(filename, vocab, stats):
     sentences_seen = stats["sentences_seen"]
     sentences_output = stats["sentences_output"]
     if sentences_seen and sentences_seen % 100000 == 0:
-      tf.logging.info("Processed %d sentences (%d output)", sentences_seen,
+      tf.compat.v1.logging.info("Processed %d sentences (%d output)", sentences_seen,
                       sentences_output)
     if FLAGS.max_sentences and sentences_output >= FLAGS.max_sentences:
       break
 
-  tf.logging.info("Completed processing file %s", filename)
+  tf.compat.v1.logging.info("Completed processing file %s", filename)
   return processed
 
 
 def _write_shard(filename, dataset, indices):
   """Writes a TFRecord shard."""
-  with tf.python_io.TFRecordWriter(filename) as writer:
+  with tf.io.TFRecordWriter(filename) as writer:
     for j in indices:
       writer.write(dataset[j])
 
@@ -242,16 +242,16 @@ def _write_dataset(name, dataset, indices, num_shards):
     indices: List of indices of 'dataset' to be written.
     num_shards: The number of output shards.
   """
-  tf.logging.info("Writing dataset %s", name)
+  tf.compat.v1.logging.info("Writing dataset %s", name)
   borders = np.int32(np.linspace(0, len(indices), num_shards + 1))
   for i in range(num_shards):
     filename = os.path.join(FLAGS.output_dir, "%s-%.5d-of-%.5d" % (name, i,
                                                                    num_shards))
     shard_indices = indices[borders[i]:borders[i + 1]]
     _write_shard(filename, dataset, shard_indices)
-    tf.logging.info("Wrote dataset indices [%d, %d) to output shard %s",
+    tf.compat.v1.logging.info("Wrote dataset indices [%d, %d) to output shard %s",
                     borders[i], borders[i + 1], filename)
-  tf.logging.info("Finished writing %d sentences in dataset %s.",
+  tf.compat.v1.logging.info("Finished writing %d sentences in dataset %s.",
                   len(indices), name)
 
 
@@ -261,20 +261,20 @@ def main(unused_argv):
   if not FLAGS.output_dir:
     raise ValueError("--output_dir is required.")
 
-  if not tf.gfile.IsDirectory(FLAGS.output_dir):
-    tf.gfile.MakeDirs(FLAGS.output_dir)
+  if not tf.io.gfile.isdir(FLAGS.output_dir):
+    tf.io.gfile.makedirs(FLAGS.output_dir)
 
   input_files = []
   for pattern in FLAGS.input_files.split(","):
-    match = tf.gfile.Glob(FLAGS.input_files)
+    match = tf.io.gfile.glob(FLAGS.input_files)
     if not match:
       raise ValueError("Found no files matching %s" % pattern)
     input_files.extend(match)
-  tf.logging.info("Found %d input files.", len(input_files))
+  tf.compat.v1.logging.info("Found %d input files.", len(input_files))
 
   vocab = _build_vocabulary(input_files)
 
-  tf.logging.info("Generating dataset.")
+  tf.compat.v1.logging.info("Generating dataset.")
   stats = collections.Counter()
   dataset = []
   for filename in input_files:
@@ -282,11 +282,11 @@ def main(unused_argv):
     if FLAGS.max_sentences and stats["sentences_output"] >= FLAGS.max_sentences:
       break
 
-  tf.logging.info("Generated dataset with %d sentences.", len(dataset))
+  tf.compat.v1.logging.info("Generated dataset with %d sentences.", len(dataset))
   for k, v in list(stats.items()):
-    tf.logging.info("%s: %d", k, v)
+    tf.compat.v1.logging.info("%s: %d", k, v)
 
-  tf.logging.info("Shuffling dataset.")
+  tf.compat.v1.logging.info("Shuffling dataset.")
   np.random.seed(123)
   shuffled_indices = np.random.permutation(len(dataset))
   val_indices = shuffled_indices[:FLAGS.num_validation_sentences]
@@ -298,4 +298,4 @@ def main(unused_argv):
 
 
 if __name__ == "__main__":
-  tf.app.run()
+  tf.compat.v1.app.run()

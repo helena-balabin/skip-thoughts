@@ -35,17 +35,17 @@ class SkipThoughtsModel(skip_thoughts_model.SkipThoughtsModel):
       return super(SkipThoughtsModel, self).build_inputs()
     else:
       # Replace disk I/O with random Tensors.
-      self.encode_ids = tf.random_uniform(
+      self.encode_ids = tf.random.uniform(
           [self.config.batch_size, 15],
           minval=0,
           maxval=self.config.vocab_size,
           dtype=tf.int64)
-      self.decode_pre_ids = tf.random_uniform(
+      self.decode_pre_ids = tf.random.uniform(
           [self.config.batch_size, 15],
           minval=0,
           maxval=self.config.vocab_size,
           dtype=tf.int64)
-      self.decode_post_ids = tf.random_uniform(
+      self.decode_post_ids = tf.random.uniform(
           [self.config.batch_size, 15],
           minval=0,
           maxval=self.config.vocab_size,
@@ -64,7 +64,7 @@ class SkipThoughtsModelTest(tf.test.TestCase):
   def _countModelParameters(self):
     """Counts the number of parameters in the model at top level scope."""
     counter = {}
-    for v in tf.global_variables():
+    for v in tf.compat.v1.global_variables():
       name = v.op.name.split("/")[0]
       num_params = v.get_shape().num_elements()
       if not num_params:
@@ -99,7 +99,7 @@ class SkipThoughtsModelTest(tf.test.TestCase):
     fetches = list(expected_shapes.keys())
 
     with self.test_session() as sess:
-      sess.run(tf.global_variables_initializer())
+      sess.run(tf.compat.v1.global_variables_initializer())
       outputs = sess.run(fetches, feed_dict)
 
     for index, output in enumerate(outputs):

@@ -60,17 +60,17 @@ class EncoderManager(object):
       checkpoint_path: SkipThoughtsModel checkpoint file or a directory
         containing a checkpoint file.
     """
-    tf.logging.info("Reading vocabulary from %s", vocabulary_file)
-    with tf.gfile.GFile(vocabulary_file, mode="r") as f:
+    tf.compat.v1.logging.info("Reading vocabulary from %s", vocabulary_file)
+    with tf.io.gfile.GFile(vocabulary_file, mode="r") as f:
       lines = list(f.readlines())
     reverse_vocab = [line.strip() for line in lines]
-    tf.logging.info("Loaded vocabulary with %d words.", len(reverse_vocab))
+    tf.compat.v1.logging.info("Loaded vocabulary with %d words.", len(reverse_vocab))
 
-    tf.logging.info("Loading embedding matrix from %s", embedding_matrix_file)
+    tf.compat.v1.logging.info("Loading embedding matrix from %s", embedding_matrix_file)
     # Note: tf.gfile.GFile doesn't work here because np.load() calls f.seek()
     # with 3 arguments.
     embedding_matrix = np.load(embedding_matrix_file)
-    tf.logging.info("Loaded embedding matrix with shape %s",
+    tf.compat.v1.logging.info("Loaded embedding matrix with shape %s",
                     embedding_matrix.shape)
 
     word_embeddings = collections.OrderedDict(
@@ -82,9 +82,9 @@ class EncoderManager(object):
       restore_model = encoder.build_graph_from_config(model_config,
                                                       checkpoint_path)
 
-    config = tf.ConfigProto()
+    config = tf.compat.v1.ConfigProto()
     config.gpu_options.allow_growth=True
-    sess = tf.Session(graph=g, config=config)
+    sess = tf.compat.v1.Session(graph=g, config=config)
     restore_model(sess)
 
     self.encoders.append(encoder)
